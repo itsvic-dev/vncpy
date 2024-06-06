@@ -167,10 +167,14 @@ class RFBHandler(socketserver.BaseRequestHandler):
         self.sendEntireFramebuffer()
 
 
-if __name__ == "__main__":
+def main():
     addr = ("0.0.0.0", 5900)
 
     print(f"Serving RFB on {addr}")
 
     with socketserver.ForkingTCPServer(addr, RFBHandler) as server:
         server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
