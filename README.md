@@ -8,6 +8,12 @@ features:
 - ☑️ known to work with TigerVNC, novnc and wlvncc
 - ☑️ very tiny, easily understandable and extensible
 - ❌ does not support 3.3 and 3.7 clients
-- ❌ does not support encodings other than raw
 - ❌ does not support partial framebuffer updates
 - ❌ does not support pixel formats other than the default
+
+## supported encoding types
+
+| s32 | type               |
+| --- | ------------------ |
+| 0   | raw                |
+| 6   | zlib (not popular) |

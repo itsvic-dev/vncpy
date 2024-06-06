@@ -1,6 +1,7 @@
 import socketserver
 import struct
 import sys
+import zlib
 from PIL import Image
 
 img = Image.open(sys.argv[1])
@@ -23,7 +24,7 @@ class RFBHandler(socketserver.BaseRequestHandler):
         return self.pack_u32(len(string_bytes)) + string_bytes
 
     def send_string(self, string: str):
-        self.request.sendall(pack_string(string))
+        self.request.sendall(self.pack_string(string))
 
     @staticmethod
     def pack_u32(num):
@@ -44,6 +45,9 @@ class RFBHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         print(f"hello {self.client_address}")
+        self.usingZlib = False
+        self.targetEncoding = 0
+
         self.pixelFormatStruct = (
             bytes(
                 [
@@ -134,10 +138,17 @@ class RFBHandler(socketserver.BaseRequestHandler):
             1,  # number-of-rectangles
         )
 
-        encodingType = 0  # raw
+        rectangleData = pixelsBytes
+
+        if self.usingZlib:
+            pixelsCompressed = self.compressobj.compress(rectangleData)
+            pixelsCompressed += self.compressobj.flush(zlib.Z_FULL_FLUSH)
+            zlibHeader = struct.pack(">I", len(pixelsCompressed))
+            rectangleData = zlibHeader + pixelsCompressed
+
         rectangle = (
-            struct.pack(">HHHHi", 0, 0, img.width, img.height, encodingType)
-            + pixelsBytes
+            struct.pack(">HHHHi", 0, 0, img.width, img.height, self.targetEncoding)
+            + rectangleData
         )
 
         self.request.sendall(messageHeader + rectangle)
@@ -159,12 +170,18 @@ class RFBHandler(socketserver.BaseRequestHandler):
         for _ in range(numberOfEncodings):
             requestedEncodings.append(self.recv_s32())
 
+        if 6 in requestedEncodings:
+            print("client supports zlib encoding (6), setting up...")
+            self.usingZlib = True
+            self.compressobj = zlib.compressobj()
+            self.targetEncoding = 6
+
     def framebufferUpdateRequest(self):
         (incremental, xPos, yPos, width, height) = struct.unpack(
             ">?HHHH", self.request.recv(1 + 4 * 2)
         )
-        # too lazy to implement partial updates lol
-        self.sendEntireFramebuffer()
+        if not incremental:
+            self.sendEntireFramebuffer()
 
 
 def main():
